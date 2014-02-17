@@ -98,13 +98,23 @@ namespace container {
 
 namespace list {
 
-struct NullItem {};
+struct NullItem
+{
+    enum { val };
+    static void Print() { cout << endl; }
+};
 
 template< typename V, typename L >
 struct List
 {
     enum { val = V::val };
     typedef V value_type;
+
+    static void Print()
+    {
+        cout << val << ", ";
+        L::Print();
+    }
 };
 
 template< class List > struct ListLength;
@@ -247,6 +257,65 @@ public:
     typedef typename Merge< L1, L2 >::NextType NextType;
 };
 
+template< class L >
+class EraseByIndex< L, 0 >
+{
+public:
+    typedef typename Next<L>::NextType NextType;
+};
+
+template< class Ls, class it >
+class Search
+{
+    template< class L, class item, unsigned i, int eq >
+    class SearchR;
+
+    template< class L, class item, unsigned i >
+    class SearchR< L, item, i, 1 >
+    {
+    public:
+        enum { val = i };
+    };
+
+    template< class item, unsigned i >
+    class SearchR< NullItem, item, i, 1 >
+    {
+    public:
+        enum { val = i };
+    };
+
+    template< class item, unsigned i >
+    class SearchR< NullItem, item, i, 0 >
+    {
+    public:
+        enum { val = -1 };
+    };
+
+    template< class L, class item, unsigned i >
+    class SearchR< L, item, i, 0 >
+    {
+        typedef typename Next<L>::NextType NextType;
+    public:
+        enum { val = SearchR< NextType, item, i + 1, Equal< NextType, item >::val >::val };
+    };
+
+public:
+    enum { val = SearchR< Ls, it, 0, Equal< Ls, it >::val >::val };
+};
+
+template< class L, class Min = L >
+class FindMinimum
+{
+public:
+};
+
+
+template< class L1, class L2 >
+class MergeSorted
+{
+public:
+};
+
 } // namespace list
 
 } // namespace container
@@ -273,7 +342,9 @@ int main()
 
     //cout << Advance< typename First< FunnyList, 2 >::NextType, 0 >::NextType::val << endl;
 
-    cout << Advance< typename EraseByIndex< FunnyList, 1 >::NextType, 1 >::NextType::val << endl;
+    //Advance< typename EraseByIndex< FunnyList, 1 >::NextType, 0 >::NextType::Print();
+
+    //cout << Search< FunnyList, Value< int, 1 > >::val << endl;
 
     return 0;
 }
