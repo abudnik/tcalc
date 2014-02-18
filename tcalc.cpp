@@ -263,6 +263,21 @@ public:
     typedef typename Reverse< ReversedA >::NextType NextType;
 };
 
+template< unsigned n, int initial = 0, int until = n + initial, int i = initial, class G = NullItem >
+class Generate
+{
+    typedef List< Value< int, i >, G > NewList;
+public:
+    typedef typename Generate< n, initial, until, i + 1, NewList >::NextType NextType;
+};
+
+template< unsigned n, int initial, int until, class G >
+class Generate<n, initial, until, until, G>
+{
+public:
+    typedef G NextType;
+};
+
 template< class L1, class L2 >
 class Merge
 {
@@ -520,6 +535,14 @@ int main()
     typedef typename Merge< FunnyList, FunnyList2 >::NextType MergedList;
     //MergedList::Print();
 
+    static const int NUM_ITEMS = 7;
+    typedef typename Generate< NUM_ITEMS >::NextType FirstList;
+    typedef typename Generate< NUM_ITEMS, NUM_ITEMS / 2 >::NextType SecondList;
+
+    typedef typename Merge< FirstList, SecondList >::NextType M;
+    typedef typename MergeSort< M >::NextType Sorted;
+    Sorted::Print();
+
     //typedef typename FindMinimum< FunnyList2 >::NextType E;
     //typedef Search< FunnyList2, E > Found;
     //typedef typename EraseByIndex< FunnyList2, Found::val >::NextType L2MinusMin;
@@ -534,8 +557,8 @@ int main()
 
     //typedef typename MergeSorted< FunnyList, FunnyList2 >::NextType MS;
     //MS::Print();
-    typedef typename MergeSort< MergedList >::NextType Sorted;
-    Sorted::Print();
+    //typedef typename MergeSort< MergedList >::NextType Sorted;
+    //Sorted::Print();
 
     //cout << FindMinimum< MergedList >::NextType::val << endl;
 
