@@ -457,12 +457,10 @@ public:
 template< class L1, class L2 >
 class MergeSorted
 {
-    typedef typename FindMinimum< L2 >::NextType E;
-    typedef Search< L2, E > Found;
-    typedef typename EraseByIndex< L2, Found::val >::NextType L2MinusMin;
+    typedef typename Next< L2 >::NextType L2MinusMin;
 
-    typedef LowerBound< L1, E > LB;
-    typedef typename InsertAt< L1, E, LB::val >::NextType L1PlusMin;
+    typedef LowerBound< L1, L2 > LB;
+    typedef typename InsertAt< L1, L2, LB::val >::NextType L1PlusMin;
 public:
     typedef typename MergeSorted< L1PlusMin, L2MinusMin >::NextType NextType;
 };
