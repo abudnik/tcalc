@@ -25,6 +25,12 @@ struct Less
     enum { val = V1::val < V2::val };
 };
 
+template< class V1, class V2>
+struct LessOrEqual
+{
+    enum { val = V1::val <= V2::val };
+};
+
 template< class V1, class V2 >
 struct Equal
 {
@@ -35,6 +41,56 @@ template< class V1, class V2 >
 struct Greater
 {
     enum { val = V1::val > V2::val };
+};
+
+template< class V1, class V2 >
+struct GreaterOrEqual
+{
+    enum { val = V1::val >= V2::val };
+};
+
+template< class V1, class V2 >
+class Min
+{
+    template< class Vi1, class Vi2, int lesser >
+    struct MinR;
+
+    template< class Vi1, class Vi2 >
+    struct MinR< Vi1, Vi2, 1 >
+    {
+        typedef Vi1 NextType;
+    };
+
+    template< class Vi1, class Vi2 >
+    struct MinR< Vi1, Vi2, 0 >
+    {
+        typedef Vi2 NextType;
+    };
+
+public:
+    typedef typename MinR< V1, V2, Less< V1, V2 >::val >::NextType NextType;
+};
+
+template< class V1, class V2 >
+class Max
+{
+    template< class Vi1, class Vi2, int lesser >
+    struct MaxR;
+
+    template< class Vi1, class Vi2 >
+    struct MaxR< Vi1, Vi2, 1 >
+    {
+        typedef Vi2 NextType;
+    };
+
+    template< class Vi1, class Vi2 >
+    struct MaxR< Vi1, Vi2, 0 >
+    {
+        typedef Vi1 NextType;
+    };
+
+public:
+    typedef typename MaxR< V1, V2, Less< V1, V2 >::val >::NextType NextType;
 };
 
 // arithmetic
@@ -248,7 +304,31 @@ public:
     typedef typename FirstR< L, n, Trivial, n - 1 >::NextType NextType;
 };
 
-template< class L, int index >
+template< class L, class Item, unsigned index, unsigned length = ListLength< L >::val >
+class InsertAt
+{
+    typedef typename First<L, index>::NextType L1;
+    typedef typename Advance<L, index>::NextType L2;
+    typedef typename PushBack< Item, L1 >::NextType L1PlusItem;
+public:
+    typedef typename Merge< L1PlusItem, L2 >::NextType NextType;
+};
+
+template< class L, class Item, unsigned index >
+class InsertAt< L, Item, index, index >
+{
+public:
+    typedef typename PushBack< Item, L >::NextType NextType;
+};
+
+template< class L, class Item, unsigned length >
+class InsertAt< L, Item, 0, length >
+{
+public:
+    typedef List< Item, L > NextType;
+};
+
+template< class L, unsigned index >
 class EraseByIndex
 {
     typedef typename First<L, index>::NextType L1;
@@ -306,14 +386,109 @@ public:
 template< class L, class Min = L >
 class FindMinimum
 {
+    typedef typename Next<L>::NextType Forward;
+    typedef typename tcalc::Min< L, Min >::NextType CurrentMin;
 public:
+    typedef typename FindMinimum< Forward, CurrentMin >::NextType NextType;
+};
+
+template< class Min >
+class FindMinimum< NullItem, Min >
+{
+public:
+    typedef Min NextType;
+};
+
+template< class Ls, class it >
+class LowerBound
+{
+    template< class L, class item, unsigned i, int eq >
+    class LowerR;
+
+    template< class L, class item, unsigned i >
+    class LowerR< L, item, i, 1 >
+    {
+    public:
+        enum { val = i };
+    };
+
+    template< class item, unsigned i >
+    class LowerR< NullItem, item, i, 1 >
+    {
+    public:
+        enum { val = i };
+    };
+
+    template< class item, unsigned i >
+    class LowerR< NullItem, item, i, 0 >
+    {
+    public:
+        enum { val = i };
+    };
+
+    template< class L, class item, unsigned i >
+    class LowerR< L, item, i, 0 >
+    {
+        typedef typename Next<L>::NextType NextType;
+    public:
+        enum { val = LowerR< NextType, item, i + 1, GreaterOrEqual< NextType, item >::val >::val };
+    };
+
+public:
+    enum { val = LowerR< Ls, it, 0, GreaterOrEqual< Ls, it >::val >::val };
 };
 
 
 template< class L1, class L2 >
 class MergeSorted
 {
+    typedef typename FindMinimum< L2 >::NextType E;
+    typedef Search< L2, E > Found;
+    typedef typename EraseByIndex< L2, Found::val >::NextType L2MinusMin;
+
+    typedef LowerBound< L1, E > LB;
+    typedef typename InsertAt< L1, E, LB::val >::NextType L1PlusMin;
 public:
+    typedef typename MergeSorted< L1PlusMin, L2MinusMin >::NextType NextType;
+};
+
+template< class L1 >
+class MergeSorted< L1, NullItem >
+{
+public:
+    typedef L1 NextType;
+};
+
+template< class L, unsigned length = ListLength< L >::val >
+class MergeSort
+{
+    typedef ListLength< L > Length;
+    typedef typename First< L, Length::val / 2 >::NextType L1;
+    typedef typename Advance< L, Length::val / 2 >::NextType L2;
+
+    typedef typename MergeSort< L1 >::NextType L1_sorted;
+    typedef typename MergeSort< L2 >::NextType L2_sorted;
+public:
+    typedef typename MergeSorted< L1_sorted, L2_sorted >::NextType NextType;
+};
+
+template< class L >
+class MergeSort< L, 2 >
+{
+    typedef L E1;
+    typedef typename Next<L>::NextType E2;
+
+    typedef typename Min<E1, E2>::NextType R1;
+    typedef typename Max<E1, E2>::NextType R2;
+public:
+    typedef List< Value< int, R1::val >, List< Value< int, R2::val >, NullItem > > NextType; // TODO: int
+};
+
+template< class L >
+class MergeSort< L, 1 >
+{
+public:
+    typedef L NextType;
 };
 
 } // namespace list
@@ -330,15 +505,39 @@ int main()
     const int v = Add< Value<int, 3>, Value<int, 42> >::val;
     const int ret = Power< Div< Value<int, 42>, Value<int, 21> >, Value<int, 8>::val >::val;
 
-    typedef List< Value<int, 1>, List< Value<int, 2>, List< Value<int, 3>, NullItem > > > FunnyList;
-    typedef List< Value<int, 4>, List< Value<int, 5>, List< Value<int, 6>, NullItem > > > FunnyList2;
+    typedef List< Value<int, 3>, List< Value<int, 2>, List< Value<int, 1>, NullItem > > > FunnyList;
+    typedef List< Value<int, 5>, List< Value<int, 4>, List< Value<int, 6>, NullItem > > > FunnyList2;
 
     //cout << ListLength< FunnyList >::val << endl;
     //cout << Advance< FunnyList, 2 >::NextType::val << endl;
 
     //cout << Advance< typename PopBack< FunnyList >::NextType, 1 >::NextType::val << endl;
     //cout << Advance< typename PushBack< Value<int, 4>, FunnyList >::NextType, 2 >::NextType::val << endl;
-    //cout << Advance< Merge< FunnyList, FunnyList2 >::Merged, 4 >::NextType::val << endl;
+
+    //typedef typename InsertAt< FunnyList, Value<int, 5>, 2 >::NextType WithVal;
+    //WithVal::Print();
+
+    typedef typename Merge< FunnyList, FunnyList2 >::NextType MergedList;
+    //MergedList::Print();
+
+    //typedef typename FindMinimum< FunnyList2 >::NextType E;
+    //typedef Search< FunnyList2, E > Found;
+    //typedef typename EraseByIndex< FunnyList2, Found::val >::NextType L2MinusMin;
+
+    //typedef LowerBound< FunnyList, E > LB;
+    //cout << LB::val << endl;
+    //typedef typename InsertAt< FunnyList, E, LB::val >::NextType L1PlusMin;
+    //L1PlusMin::Print();
+    //typedef typename InsertAt< L1, E, LB::val >::NextType L1PlusMin;
+
+    //L2MinusMin::Print();
+
+    //typedef typename MergeSorted< FunnyList, FunnyList2 >::NextType MS;
+    //MS::Print();
+    typedef typename MergeSort< MergedList >::NextType Sorted;
+    Sorted::Print();
+
+    //cout << FindMinimum< MergedList >::NextType::val << endl;
 
     //cout << Advance< typename First< FunnyList, 2 >::NextType, 0 >::NextType::val << endl;
 
