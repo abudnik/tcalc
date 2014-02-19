@@ -233,19 +233,33 @@ public:
     typedef List< First, NullItem > NextType;
 };
 
-template< class L, int length = ListLength< L >::val >
+template< class L >
 class PopBack
 {
-    typedef typename Next< L >::NextType Remaining;
-public:
-    typedef List< typename L::value_type, typename PopBack< Remaining, length - 1 >::NextType > NextType;
-};
+    template< class Li, int length >
+    class PopBackR
+    {
+        typedef typename Next< Li >::NextType Remaining;
+    public:
+        typedef List< typename Li::value_type, typename PopBackR< Remaining, length - 1 >::NextType > NextType;
+    };
 
-template< class L>
-class PopBack< L, 2 >
-{
+    template< class Li >
+    class PopBackR< Li, 2 >
+    {
+    public:
+        typedef List< typename Li::value_type, NullItem > NextType;
+    };
+
+    template< class Li >
+    class PopBackR< Li, 1 >
+    {
+    public:
+        typedef NullItem NextType;
+    };
+
 public:
-    typedef List< typename L::value_type, NullItem > NextType;
+    typedef typename PopBackR< L, ListLength< L >::val >::NextType NextType;
 };
 
 template< class L >
@@ -263,16 +277,16 @@ public:
     typedef typename Reverse< ReversedA >::NextType NextType;
 };
 
-template< unsigned n, int initial = 0, int until = n + initial, int i = initial, class G = NullItem >
+template< unsigned n, int i = 0, int until = n + i, class G = NullItem >
 class Generate
 {
     typedef List< Value< int, i >, G > NewList;
 public:
-    typedef typename Generate< n, initial, until, i + 1, NewList >::NextType NextType;
+    typedef typename Generate< n, i + 1, until, NewList >::NextType NextType;
 };
 
-template< unsigned n, int initial, int until, class G >
-class Generate<n, initial, until, until, G>
+template< unsigned n, int until, class G >
+class Generate<n, until, until, G>
 {
 public:
     typedef G NextType;
@@ -297,33 +311,33 @@ public:
 template< class L, unsigned n, unsigned i = 0 >
 class First
 {
-    typedef List< typename L::value_type, NullItem > Trivial;
-
     template< class Li, unsigned ni, class Ri, unsigned ii >
     class FirstR
     {
-        enum { index = ni - ii };
-        typedef typename PushBack< typename Advance< Li, index >::NextType, Ri >::NextType Ls;
+        typedef typename PushBack< typename Li::value_type, Ri >::NextType Ls;
+        typedef typename Next< Li >::NextType Forward;
     public:
-        typedef typename FirstR< Li, ni, Ls, ii - 1 >::NextType NextType;
+        typedef typename FirstR< Forward, ni, Ls, ii + 1 >::NextType NextType;
     };
 
     template< class Li, unsigned ni, class Ri >
-    class FirstR< Li, ni, Ri, 0 >
+    class FirstR< Li, ni, Ri, ni >
     {
     public:
         typedef Ri NextType;
     };
 
+    typedef List< typename L::value_type, NullItem > Trivial;
+    typedef typename Next< L >::NextType Forward;
 public:
-    typedef typename FirstR< L, n, Trivial, n - 1 >::NextType NextType;
+    typedef typename FirstR< Forward, n, Trivial, 1 >::NextType NextType;
 };
 
 template< class L, class Item, unsigned index, unsigned length = ListLength< L >::val >
 class InsertAt
 {
-    typedef typename First<L, index>::NextType L1;
-    typedef typename Advance<L, index>::NextType L2;
+    typedef typename First< L, index >::NextType L1;
+    typedef typename Advance< L, index >::NextType L2;
     typedef typename PushBack< Item, L1 >::NextType L1PlusItem;
 public:
     typedef typename Merge< L1PlusItem, L2 >::NextType NextType;
@@ -492,9 +506,14 @@ class MergeSort< L, 2 >
     typedef typename Next<L>::NextType E2;
 
     typedef typename Min<E1, E2>::NextType R1;
+    typedef typename R1::value_type R1_val;
+    typedef typename R1_val::value_type value_type1;
+
     typedef typename Max<E1, E2>::NextType R2;
+    typedef typename R2::value_type R2_val;
+    typedef typename R2_val::value_type value_type2;
 public:
-    typedef List< Value< int, R1::val >, List< Value< int, R2::val >, NullItem > > NextType; // TODO: int
+    typedef List< Value< value_type1, R1_val::val >, List< Value< value_type2, R2_val::val >, NullItem > > NextType;
 };
 
 template< class L >
