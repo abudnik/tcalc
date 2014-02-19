@@ -97,43 +97,43 @@ public:
 template< class V1, class V2 >
 struct Add
 {
-    enum { val = V1::val + V2::val };
+    typedef Value< typename V1::value_type, V1::val + V2::val > NextType;
 };
 
 template< class V1, class V2 >
 struct Sub
 {
-    enum { val = V1::val - V2::val };
+    typedef Value< typename V1::value_type, V1::val - V2::val > NextType;
 };
 
 template< class V1, class V2 >
 struct Mul
 {
-    enum { val = V1::val * V2::val };
+    typedef Value< typename V1::value_type, V1::val * V2::val > NextType;
 };
 
 template< class V1, class V2 >
 struct Div
 {
-    enum { val = V1::val / V2::val };
+    typedef Value< typename V1::value_type, V1::val / V2::val > NextType;
 };
 
 template< class V, unsigned p >
 struct Power
 {
-    enum { val = Power< V, p - 1 >::val * V::val };
+    typedef Value< typename V::value_type, Power< V, p - 1 >::NextType::val * V::val > NextType;
 };
 
 template< class V >
 struct Power< V, 1 >
 {
-    enum { val = V::val };
+    typedef V NextType;
 };
 
 template< class V >
 struct Power< V, 0 >
 {
-    enum { val = 1 };
+    typedef Value< typename V::value_type, 1 > NextType;
 };
 
 // special-purpose
@@ -275,6 +275,13 @@ class PushBack
     typedef List< V, Reversed > ReversedA;
 public:
     typedef typename Reverse< ReversedA >::NextType NextType;
+};
+
+template< class V >
+class PushBack< V, NullItem >
+{    
+public:
+    typedef List< V, NullItem > NextType;
 };
 
 template< unsigned n, int i = 0, int until = n + i, class G = NullItem >
@@ -523,6 +530,66 @@ public:
     typedef L NextType;
 };
 
+// functional
+template< class L, template<class, class> class F, class BindParam >
+class Map
+{
+    template< class Param, template<class, class> class T, class Value >
+    struct Mutator : T< Param, Value >
+    {
+    };
+
+    typedef typename L::value_type E;
+    typedef typename Mutator< BindParam, F, E >::NextType Mut;
+
+    typedef typename Next<L>::NextType Forward;
+public:
+    typedef List< Mut, typename Map< Forward, F, BindParam >::NextType > NextType;
+};
+
+template< template<class, class> class F, class BindParam >
+class Map< NullItem, F, BindParam >
+{
+public:
+    typedef NullItem NextType;
+};
+
+template< class L, template<class, class> class LeftPredicate, class BindParam, class G = NullItem >
+class Filter
+{
+    template< class Param, template<class, class> class P, class Value >
+    struct Predicate : P< Value, Param >
+    {
+    };
+
+    template< class Li, class V, int eq >
+    struct Match
+    {
+        typedef typename PushBack< V, Li >::NextType NextType;
+    };
+
+    template< class Li, class V >
+    struct Match< Li, V, 0 >
+    {
+        typedef Li NextType;
+    };
+
+    typedef typename L::value_type E;
+    typedef Predicate< BindParam, LeftPredicate, E > AppliedPredicate;
+    typedef typename Match< G, E, AppliedPredicate::val >::NextType Matched;
+
+    typedef typename Next<L>::NextType Forward;
+public:
+    typedef typename Filter< Forward, LeftPredicate, BindParam, Matched >::NextType NextType;
+};
+
+template< template<class, class> class LeftPredicate, class BindParam, class G >
+class Filter< NullItem, LeftPredicate, BindParam, G >
+{
+public:
+    typedef G NextType;
+};
+
 } // namespace list
 
 } // namespace container
@@ -534,8 +601,8 @@ int main()
 {
     using namespace tcalc;
     using namespace tcalc::container::list;
-    const int v = Add< Value<int, 3>, Value<int, 42> >::val;
-    const int ret = Power< Div< Value<int, 42>, Value<int, 21> >, Value<int, 8>::val >::val;
+    const int v = Add< Value<int, 3>, Value<int, 42> >::NextType::val;
+    const int ret = Power< Div< Value<int, 42>, Value<int, 21> >::NextType, 8 >::NextType::val;
 
     typedef List< Value<int, 3>, List< Value<int, 2>, List< Value<int, 1>, NullItem > > > FunnyList;
     typedef List< Value<int, 5>, List< Value<int, 4>, List< Value<int, 6>, NullItem > > > FunnyList2;
@@ -552,13 +619,19 @@ int main()
     typedef typename Merge< FunnyList, FunnyList2 >::NextType MergedList;
     //MergedList::Print();
 
-    static const int NUM_ITEMS = 7;
+    static const int NUM_ITEMS = 3;
     typedef typename Generate< NUM_ITEMS >::NextType FirstList;
     typedef typename Generate< NUM_ITEMS, NUM_ITEMS / 2 >::NextType SecondList;
 
     typedef typename Merge< FirstList, SecondList >::NextType M;
     typedef typename MergeSort< M >::NextType Sorted;
     Sorted::Print();
+
+    typedef typename Map< Sorted, Add, Value<int, 100> >::NextType Plus100;
+    Plus100::Print();
+
+    typedef typename Filter< Sorted, Less, Value<int, 2> >::NextType Filtered;
+    Filtered::Print();
 
     //typedef typename FindMinimum< FunnyList2 >::NextType E;
     //typedef Search< FunnyList2, E > Found;
