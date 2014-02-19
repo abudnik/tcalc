@@ -534,13 +534,13 @@ public:
 template< class L, template<class, class> class F, class BindParam >
 class Map
 {
-    template< class Param, template<class, class> class T, class Value >
+    template< template<class, class> class T, class Param, class Value >
     struct Mutator : T< Param, Value >
     {
     };
 
     typedef typename L::value_type E;
-    typedef typename Mutator< BindParam, F, E >::NextType Mut;
+    typedef typename Mutator< F, BindParam, E >::NextType Mut;
 
     typedef typename Next<L>::NextType Forward;
 public:
@@ -552,6 +552,29 @@ class Map< NullItem, F, BindParam >
 {
 public:
     typedef NullItem NextType;
+};
+
+template< class L, template<class, class> class F, class Value >
+class Fold
+{
+    template< template<class, class> class T, class Param, class V >
+    struct Mutator : T< Param, V >
+    {
+    };
+
+    typedef typename L::value_type E;
+    typedef typename Mutator< F, Value, E >::NextType Mut;
+
+    typedef typename Next<L>::NextType Forward;
+public:
+    typedef typename Fold< Forward, F, Mut >::NextType NextType;
+};
+
+template< template<class, class> class F, class Value >
+class Fold< NullItem, F, Value >
+{
+public:
+    typedef Value NextType;
 };
 
 template< class L, template<class, class> class LeftPredicate, class BindParam, class G = NullItem >
@@ -629,6 +652,9 @@ int main()
 
     typedef typename Map< Sorted, Add, Value<int, 100> >::NextType Plus100;
     Plus100::Print();
+
+    typedef typename Fold< Plus100, Add, Value<int> >::NextType Folded;
+    cout << Folded::val << endl;
 
     typedef typename Filter< Sorted, Less, Value<int, 2> >::NextType Filtered;
     Filtered::Print();
