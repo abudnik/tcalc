@@ -12,6 +12,13 @@ struct Value
     typedef T value_type;
 };
 
+#define DECLARE_STR( s, postfix )  \
+    struct StringValue_##postfix { \
+        static const char *val;    \
+        typedef char *value_type;  \
+    };                             \
+    const char *StringValue_##postfix::val = s;
+
 template< typename T, T v >
 struct Negate
 {
@@ -156,19 +163,17 @@ namespace list {
 
 struct NullItem
 {
-    enum { val };
     static void Print() { cout << endl; }
 };
 
 template< typename V, typename L >
 struct List
 {
-    enum { val = V::val };
     typedef V value_type;
 
     static void Print()
     {
-        cout << val << ", ";
+        cout << value_type::val << ", ";
         L::Print();
     }
 };
@@ -383,6 +388,10 @@ public:
 template< class Ls, class it >
 class Search
 {
+public:
+    static const int NOT_FOUND = -1;
+
+private:
     template< class L, class item, unsigned i, int eq >
     class SearchR;
 
@@ -404,7 +413,7 @@ class Search
     class SearchR< NullItem, item, i, 0 >
     {
     public:
-        enum { val = -1 };
+        enum { val = NOT_FOUND };
     };
 
     template< class L, class item, unsigned i >
@@ -412,18 +421,18 @@ class Search
     {
         typedef typename Next<L>::NextType NextType;
     public:
-        enum { val = SearchR< NextType, item, i + 1, Equal< NextType, item >::val >::val };
+        enum { val = SearchR< NextType, item, i + 1, Equal< typename NextType::value_type, item >::val >::val };
     };
 
 public:
-    enum { val = SearchR< Ls, it, 0, Equal< Ls, it >::val >::val };
+    enum { val = SearchR< Ls, it, 0, Equal< typename Ls::value_type, it >::val >::val };
 };
 
-template< class L, class Min = L >
+template< class L, typename Min = typename L::value_type >
 class FindMinimum
 {
     typedef typename Next<L>::NextType Forward;
-    typedef typename tcalc::Min< L, Min >::NextType CurrentMin;
+    typedef typename tcalc::Min< typename L::value_type, Min >::NextType CurrentMin;
 public:
     typedef typename FindMinimum< Forward, CurrentMin >::NextType NextType;
 };
@@ -445,14 +454,21 @@ class LowerBound
     class LowerR< L, item, i, 1 >
     {
     public:
-        enum { val = i };
+        enum { val = i - 1 };
+    };
+
+    template< class L, class item >
+    class LowerR< L, item, 0, 1 >
+    {
+    public:
+        enum { val = 0 };
     };
 
     template< class item, unsigned i >
     class LowerR< NullItem, item, i, 1 >
     {
     public:
-        enum { val = i };
+        enum { val = i - 1 };
     };
 
     template< class item, unsigned i >
@@ -467,11 +483,11 @@ class LowerBound
     {
         typedef typename Next<L>::NextType NextType;
     public:
-        enum { val = LowerR< NextType, item, i + 1, GreaterOrEqual< NextType, item >::val >::val };
+        enum { val = LowerR< NextType, item, i + 1, Greater< typename L::value_type, item >::val >::val };
     };
 
 public:
-    enum { val = LowerR< Ls, it, 0, GreaterOrEqual< Ls, it >::val >::val };
+    enum { val = LowerR< Ls, it, 0, Greater< typename Ls::value_type, it >::val >::val };
 };
 
 
@@ -480,8 +496,9 @@ class MergeSorted
 {
     typedef typename Next< L2 >::NextType L2MinusMin;
 
-    typedef LowerBound< L1, L2 > LB;
-    typedef typename InsertAt< L1, L2, LB::val >::NextType L1PlusMin;
+    typedef typename L2::value_type Min;
+    typedef LowerBound< L1, Min > LB;
+    typedef typename InsertAt< L1, Min, LB::val >::NextType L1PlusMin;
 public:
     typedef typename MergeSorted< L1PlusMin, L2MinusMin >::NextType NextType;
 };
@@ -509,18 +526,14 @@ public:
 template< class L >
 class MergeSort< L, 2 >
 {
-    typedef L E1;
-    typedef typename Next<L>::NextType E2;
+    typedef typename L::value_type E1;
+    typedef typename Next<L>::NextType Forward;
+    typedef typename Forward::value_type E2;
 
     typedef typename Min<E1, E2>::NextType R1;
-    typedef typename R1::value_type R1_val;
-    typedef typename R1_val::value_type value_type1;
-
     typedef typename Max<E1, E2>::NextType R2;
-    typedef typename R2::value_type R2_val;
-    typedef typename R2_val::value_type value_type2;
 public:
-    typedef List< Value< value_type1, R1_val::val >, List< Value< value_type2, R2_val::val >, NullItem > > NextType;
+    typedef List< R1, List< R2, NullItem > > NextType;
 };
 
 template< class L >
@@ -620,6 +633,13 @@ public:
 } // namespace tcalc
 
 
+// string type declaration
+namespace tcalc
+{
+    DECLARE_STR( "abc", 1 );
+}
+
+
 int main()
 {
     using namespace tcalc;
@@ -627,8 +647,8 @@ int main()
     const int v = Add< Value<int, 3>, Value<int, 42> >::NextType::val;
     const int ret = Power< Div< Value<int, 42>, Value<int, 21> >::NextType, 8 >::NextType::val;
 
-    typedef List< Value<int, 3>, List< Value<int, 2>, List< Value<int, 1>, NullItem > > > FunnyList;
-    typedef List< Value<int, 5>, List< Value<int, 4>, List< Value<int, 6>, NullItem > > > FunnyList2;
+    typedef List< Value< int, 3 >, List< Value<int, 2>, List< Value<int, 1>, NullItem > > > FunnyList;
+    typedef List< Value< int, 5 >, List< Value<int, 4>, List< Value<int, 6>, NullItem > > > FunnyList2;
 
     //cout << ListLength< FunnyList >::val << endl;
     //cout << Advance< FunnyList, 2 >::NextType::val << endl;
@@ -642,7 +662,7 @@ int main()
     typedef typename Merge< FunnyList, FunnyList2 >::NextType MergedList;
     //MergedList::Print();
 
-    static const int NUM_ITEMS = 3;
+    static const int NUM_ITEMS = 7;
     typedef typename Generate< NUM_ITEMS >::NextType FirstList;
     typedef typename Generate< NUM_ITEMS, NUM_ITEMS / 2 >::NextType SecondList;
 
@@ -659,11 +679,14 @@ int main()
     typedef typename Filter< Sorted, Less, Value<int, 2> >::NextType Filtered;
     Filtered::Print();
 
+    //typedef List< StringValue_1, NullItem > StringList;
+    //StringList::Print();
+
     //typedef typename FindMinimum< FunnyList2 >::NextType E;
     //typedef Search< FunnyList2, E > Found;
     //typedef typename EraseByIndex< FunnyList2, Found::val >::NextType L2MinusMin;
 
-    //typedef LowerBound< FunnyList, E > LB;
+    //typedef LowerBound< FunnyList2, Value< int, 2 > > LB;
     //cout << LB::val << endl;
     //typedef typename InsertAt< FunnyList, E, LB::val >::NextType L1PlusMin;
     //L1PlusMin::Print();
@@ -671,10 +694,16 @@ int main()
 
     //L2MinusMin::Print();
 
-    //typedef typename MergeSorted< FunnyList, FunnyList2 >::NextType MS;
-    //MS::Print();
-    //typedef typename MergeSort< MergedList >::NextType Sorted;
-    //Sorted::Print();
+    /*typedef List< Value<int, 1>, List< Value<int, 3>, NullItem > > FL;
+    typedef List< Value<int, 3>, NullItem > FL2;
+
+    typedef LowerBound< FL, Value< int, 2 > > LBx;
+    cout << LBx::val << endl;
+
+    typedef typename MergeSorted< FunnyList, FunnyList2 >::NextType MS;
+    MS::Print();
+    typedef typename MergeSort< MS >::NextType Sorted;
+    Sorted::Print();*/
 
     //cout << FindMinimum< MergedList >::NextType::val << endl;
 
@@ -683,6 +712,11 @@ int main()
     //Advance< typename EraseByIndex< FunnyList, 1 >::NextType, 0 >::NextType::Print();
 
     //cout << Search< FunnyList, Value< int, 1 > >::val << endl;
+
+    ////////
+
+    typedef List< Value< int, 1 >, List< StringValue_1, NullItem > > ValueList;
+    ValueList::Print();
 
     return 0;
 }
