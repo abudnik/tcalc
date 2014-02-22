@@ -19,10 +19,16 @@ struct Value
     };                             \
     const char *StringValue_##postfix::val = s;
 
-template< typename T, T v >
-struct Negate
+template< typename T1, typename T2>
+struct TypeEqual
 {
-    enum { val = -v };
+    enum { val = 0 };
+};
+
+template< typename T >
+struct TypeEqual< T, T >
+{
+    enum { val = 1 };
 };
 
 // comparision
@@ -101,6 +107,12 @@ public:
 };
 
 // arithmetic
+template< typename T, T v >
+struct Negate
+{
+    enum { val = -v };
+};
+
 template< class V1, class V2 >
 struct Add
 {
