@@ -640,10 +640,71 @@ public:
 
 } // namespace list
 
+namespace map {
+
+using namespace list; // map implemented as list of Key-Value pairs
+
+template< typename K, typename V >
+struct Pair
+{
+    typedef K Key;
+    typedef V Value;
+};
+
+template< typename Key, typename Map >
+class HasKey
+{
+    template< typename K, typename M, int eq >
+    struct HasKeyR;
+
+    template< typename K, typename M >
+    struct HasKeyR< K, M, 0 >
+    {
+        typedef typename HasKey< K, typename Next< M >::NextType >::NextType NextType;
+    };
+
+    template< typename K, typename M >
+    struct HasKeyR< K, M, 1 >
+    {
+        typedef Value<int, 1> NextType;
+    };
+
+    typedef typename Map::value_type Item;
+    typedef typename Item::Key K;
+public:
+    typedef typename HasKeyR< Key, Map, TypeEqual< Key, K >::val >::NextType NextType;
+};
+
+template< typename Key >
+class HasKey< Key, NullItem >
+{
+public:
+    typedef Value<int, 0> NextType;
+};
+
+} // namespace map
+
 } // namespace container
 
-} // namespace tcalc
+namespace prolog {
 
+template< typename Predicate, typename ArgList >
+struct Term
+{
+    typedef Predicate Pred;
+    typedef ArgList   Args;
+};
+
+template< typename Term, typename TermList >
+struct Rule
+{
+    typedef Term     Head;
+    typedef TermList Goals;
+};
+
+} // namespace prolog
+
+} // namespace tcalc
 
 // string type declaration
 namespace tcalc
@@ -652,15 +713,19 @@ namespace tcalc
 }
 
 
-int main()
+void TestProlog()
+{
+}
+
+void TestList()
 {
     using namespace tcalc;
     using namespace tcalc::container::list;
     const int v = Add< Value<int, 3>, Value<int, 42> >::NextType::val;
     const int ret = Power< Div< Value<int, 42>, Value<int, 21> >::NextType, 8 >::NextType::val;
 
-    typedef List< Value< int, 3 >, List< Value<int, 2>, List< Value<int, 1>, NullItem > > > FunnyList;
-    typedef List< Value< int, 5 >, List< Value<int, 4>, List< Value<int, 6>, NullItem > > > FunnyList2;
+    //typedef List< Value< int, 3 >, List< Value<int, 2>, List< Value<int, 1>, NullItem > > > FunnyList;
+    //typedef List< Value< int, 5 >, List< Value<int, 4>, List< Value<int, 6>, NullItem > > > FunnyList2;
 
     //cout << ListLength< FunnyList >::val << endl;
     //cout << Advance< FunnyList, 2 >::NextType::val << endl;
@@ -671,10 +736,10 @@ int main()
     //typedef typename InsertAt< FunnyList, Value<int, 5>, 2 >::NextType WithVal;
     //WithVal::Print();
 
-    typedef typename Merge< FunnyList, FunnyList2 >::NextType MergedList;
+    //typedef typename Merge< FunnyList, FunnyList2 >::NextType MergedList;
     //MergedList::Print();
 
-    static const int NUM_ITEMS = 7;
+    /*static const int NUM_ITEMS = 1;
     typedef typename Generate< NUM_ITEMS >::NextType FirstList;
     typedef typename Generate< NUM_ITEMS, NUM_ITEMS / 2 >::NextType SecondList;
 
@@ -689,7 +754,7 @@ int main()
     cout << Folded::val << endl;
 
     typedef typename Filter< Sorted, Less, Value<int, 2> >::NextType Filtered;
-    Filtered::Print();
+    Filtered::Print();*/
 
     //typedef List< StringValue_1, NullItem > StringList;
     //StringList::Print();
@@ -728,7 +793,11 @@ int main()
     ////////
 
     typedef List< Value< int, 1 >, List< StringValue_1, NullItem > > ValueList;
-    ValueList::Print();
+    //ValueList::Print();
+}
 
+int main()
+{
+    TestProlog();
     return 0;
 }
