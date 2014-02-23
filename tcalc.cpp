@@ -382,7 +382,7 @@ public:
 };
 
 template< class L, unsigned index >
-class EraseByIndex
+class EraseAtIndex
 {
     typedef typename First<L, index>::NextType L1;
     typedef typename Advance<L, index + 1>::NextType L2;
@@ -391,7 +391,7 @@ public:
 };
 
 template< class L >
-class EraseByIndex< L, 0 >
+class EraseAtIndex< L, 0 >
 {
 public:
     typedef typename Next<L>::NextType NextType;
@@ -652,34 +652,109 @@ struct Pair
 };
 
 template< typename Key, typename Map >
-class HasKey
+class FindKey
 {
     template< typename K, typename M, int eq >
-    struct HasKeyR;
-
-    template< typename K, typename M >
-    struct HasKeyR< K, M, 0 >
+    struct FindKeyR
     {
-        typedef typename HasKey< K, typename Next< M >::NextType >::NextType NextType;
+        typedef typename M::value_type NextType;
     };
 
     template< typename K, typename M >
-    struct HasKeyR< K, M, 1 >
+    struct FindKeyR< K, M, 0 >
     {
-        typedef Value<int, 1> NextType;
+        typedef typename FindKey< K, typename Next< M >::NextType >::NextType NextType;
     };
 
     typedef typename Map::value_type Item;
     typedef typename Item::Key K;
 public:
-    typedef typename HasKeyR< Key, Map, TypeEqual< Key, K >::val >::NextType NextType;
+    typedef typename FindKeyR< Key, Map, TypeEqual< Key, K >::val >::NextType NextType;
 };
 
 template< typename Key >
-class HasKey< Key, NullItem >
+class FindKey< Key, NullItem >
 {
 public:
-    typedef Value<int, 0> NextType;
+    typedef NullItem NextType;
+};
+
+template< class Pair, typename Map, unsigned index = 0, typename Forward = Map >
+class AddKey
+{
+    template< typename P, typename M, unsigned i, typename F, int eq > // eq => replace
+    class AddKeyR
+    {
+        typedef typename InsertAt< M, P, i >::NextType Left;
+        typedef typename First< Left, i + 1 >::NextType L1;
+        typedef typename Advance< M, i + 1 >::NextType Right;
+    public:
+        typedef typename Merge< L1, Right >::NextType NextType;
+    };
+
+    template< typename P, typename M, unsigned i, typename F >
+    class AddKeyR< P, M, i, F, 0 >
+    {
+    public:
+        typedef typename AddKey< P, M, i + 1, typename Next< F >::NextType >::NextType NextType;
+    };
+
+    template< typename P, unsigned i, typename F, int eq > // empty map
+    class AddKeyR< P, NullItem, i, F, eq >
+    {
+    public:
+        typedef List< P, NullItem > NextType;
+    };
+
+    typedef typename Forward::value_type Item;
+    typedef typename Item::Key K;
+    typedef typename Pair::Key Key;
+public:
+    typedef typename AddKeyR< Pair, Map, index, Forward, TypeEqual< K, Key >::val >::NextType NextType;
+};
+
+template< class Pair, typename Map, unsigned index >
+class AddKey< Pair, Map, index, NullItem >
+{
+public:
+    typedef List< Pair, Map > NextType;
+};
+
+template< class Key, typename Map, unsigned index = 0, typename Forward = Map >
+class EraseKey
+{
+    template< typename K, typename M, unsigned i, typename F, int eq >
+    class EraseKeyR
+    {
+    public:
+        typedef typename EraseAtIndex< M, i >::NextType NextType;
+    };
+
+    template< typename K, typename M, unsigned i, typename F >
+    class EraseKeyR< K, M, i, F, 0 >
+    {
+    public:
+        typedef typename EraseKey< K, M, i + 1, typename Next< F >::NextType >::NextType NextType;
+    };
+
+    template< typename K, unsigned i, typename F, int eq > // empty map
+    class EraseKeyR< K, NullItem, i, F, eq >
+    {
+    public:
+        typedef NullItem NextType;
+    };
+
+    typedef typename Forward::value_type Item;
+    typedef typename Item::Key K;
+public:
+    typedef typename EraseKeyR< Key, Map, index, Forward, TypeEqual< K, Key >::val >::NextType NextType;
+};
+
+template< class Key, typename Map, unsigned index >
+class EraseKey< Key, Map, index, NullItem >
+{
+public:
+    typedef Map NextType;
 };
 
 } // namespace map
@@ -761,7 +836,7 @@ void TestList()
 
     //typedef typename FindMinimum< FunnyList2 >::NextType E;
     //typedef Search< FunnyList2, E > Found;
-    //typedef typename EraseByIndex< FunnyList2, Found::val >::NextType L2MinusMin;
+    //typedef typename EraseAtIndex< FunnyList2, Found::val >::NextType L2MinusMin;
 
     //typedef LowerBound< FunnyList2, Value< int, 2 > > LB;
     //cout << LB::val << endl;
@@ -786,7 +861,7 @@ void TestList()
 
     //cout << Advance< typename First< FunnyList, 2 >::NextType, 0 >::NextType::val << endl;
 
-    //Advance< typename EraseByIndex< FunnyList, 1 >::NextType, 0 >::NextType::Print();
+    //Advance< typename EraseAtIndex< FunnyList, 1 >::NextType, 0 >::NextType::Print();
 
     //cout << Search< FunnyList, Value< int, 1 > >::val << endl;
 
@@ -794,6 +869,29 @@ void TestList()
 
     typedef List< Value< int, 1 >, List< StringValue_1, NullItem > > ValueList;
     //ValueList::Print();
+}
+
+void TestMap()
+{
+    using namespace tcalc;
+    using namespace tcalc::container::map;
+
+    typedef NullItem Initial;
+    typedef AddKey< Pair< tcalc::Value<int,0>, tcalc::Value<int,10> >, Initial >::NextType One;
+    typedef AddKey< Pair< tcalc::Value<int,0>, tcalc::Value<int,5> >, One >::NextType ReplaceOne;
+    typedef FindKey< tcalc::Value<int,0>, ReplaceOne >::NextType FoundOne;
+    cout << FoundOne::Value::val << endl;
+    cout << ListLength< ReplaceOne >::val << endl;
+
+    typedef AddKey< Pair< tcalc::Value<int,1>, tcalc::Value<int,3> >, One >::NextType Two;
+    cout << ListLength< Two >::val << endl;
+
+    typedef AddKey< Pair< tcalc::Value<int,2>, tcalc::Value<int,6> >, Two >::NextType Three;
+    typedef AddKey< Pair< tcalc::Value<int,2>, tcalc::Value<int,2> >, Three >::NextType ReplaceThree;
+    cout << ListLength< ReplaceThree >::val << endl;
+
+    typedef EraseKey< tcalc::Value<int,1>, Three >::NextType Erased;
+    cout << ListLength< Erased >::val << endl;
 }
 
 int main()
