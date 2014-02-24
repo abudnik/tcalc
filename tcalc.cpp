@@ -763,6 +763,9 @@ public:
 
 namespace prolog {
 
+using namespace container::list;
+using namespace container::map;
+
 template< typename Predicate, typename ArgList >
 struct Term
 {
@@ -775,6 +778,166 @@ struct Rule
 {
     typedef Term     Head;
     typedef TermList Goals;
+};
+
+template< typename SrcTerm, typename SrcEnv, typename DestTerm, typename DestEnv >
+class Unify
+{
+    template< typename ST, typename SE, typename DT, typename DE, unsigned nArgs, int i >
+    class UnifyR
+    {
+        typedef typename Advance< typename ST::Args, i >::NextType STT;
+        typedef typename STT::value_type SrcArg;
+        enum { sVar = ( SrcArg::val[0] >= 'A' ) || ( SrcArg::val[0] <= 'Z' ) };
+
+        typedef typename Advance< typename DT::Args, i >::NextType DTT;
+        typedef typename DTT::value_type DestArg;
+        enum { dVar = ( DestArg::val[0] >= 'A' ) || ( DestArg::val[0] <= 'Z' ) };
+
+        template< typename sArg, typename sEnv, int isVar >
+        struct DefineSrcVal
+        {
+            typedef typename FindKey< sArg, sEnv >::NextType Val;
+        };
+
+        template< typename sArg, typename sEnv >
+        struct DefineSrcVal< sArg, sEnv, 0 >
+        {
+            typedef sArg Val;
+        };
+
+        typedef typename DefineSrcVal< SrcArg, SE, sVar >::Val SrcVal;
+
+
+        template< typename STi, typename SEi, typename DTi, typename DEi, unsigned nArgsi, int ii, int eq >
+        class CompareWithSrcVal
+        {
+            typedef UnifyR< STi, SEi, DTi, DEi, nArgsi, ii + 1 > Result; // next iteration
+        public:
+            typedef typename Result::ResultEnv ResultEnv;
+            enum { ret = Result::ret };
+        };
+
+        template< typename STi, typename SEi, typename DTi, typename DEi, unsigned nArgsi, int ii >
+        class CompareWithSrcVal< STi, SEi, DTi, DEi, nArgsi, ii, 0 >
+        {
+        public:
+            typedef DEi ResultEnv;
+            enum { ret = 0 };
+        };
+
+        template< typename STi, typename SEi, typename DTi, typename DEi, unsigned nArgsi, int ii, typename DestVal, int eq >
+        class CheckDestVal
+        {
+            typedef CompareWithSrcVal< STi, SEi, DTi, DEi, nArgsi, ii, TypeEqual< DestVal, SrcVal >::val > Result;
+        public:
+            typedef typename Result::ResultEnv ResultEnv;
+            enum { ret = Result::ret };
+        };
+
+        template< typename STi, typename SEi, typename DTi, typename DEi, unsigned nArgsi, int ii, typename DestVal >
+        class CheckDestVal< STi, SEi, DTi, DEi, nArgsi, ii, DestVal, 0 >
+        {
+            typedef typename AddKey< Pair< DestArg, DestVal >, DEi >::NextType Updated;
+            typedef UnifyR< STi, SEi, DTi, Updated, nArgsi, ii + 1 > Result; // next iteration
+        public:
+            typedef typename Result::ResultEnv ResultEnv;
+            enum { ret = Result::ret };
+        };
+
+        template< typename STi, typename SEi, typename DTi, typename DEi, unsigned nArgsi, int ii, int eq >
+        class CheckDestArg
+        {
+            typedef typename FindKey< DestArg, DE >::NextType DestVal;
+            typedef CheckDestVal< STi, SEi, DTi, DEi, nArgsi, ii, DestVal, TypeEqual< DestVal, NullItem >::val > Result;
+        public:
+            typedef typename Result::ResultEnv ResultEnv;
+            enum { ret = Result::ret };
+        };
+
+        template< typename STi, typename SEi, typename DTi, typename DEi, unsigned nArgsi, int ii >
+        class CheckDestArg< STi, SEi, DTi, DEi, nArgsi, ii, 0 >
+        {
+            typedef CompareWithSrcVal< STi, SEi, DTi, DEi, nArgsi, ii, TypeEqual< DestArg, SrcVal >::val > Result;
+        public:
+            typedef typename Result::ResultEnv ResultEnv;
+            enum { ret = Result::ret };
+        };
+
+        template< typename STi, typename SEi, typename DTi, typename DEi, unsigned nArgsi, int ii, int eq >
+        class CheckSrcVal
+        {
+            typedef UnifyR< STi, SEi, DTi, DEi, nArgsi, ii + 1 > Result; // next iteration
+        public:
+            typedef typename Result::ResultEnv ResultEnv;
+            enum { ret = Result::ret };
+        };
+
+        template< typename STi, typename SEi, typename DTi, typename DEi, unsigned nArgsi, int ii >
+        class CheckSrcVal< STi, SEi, DTi, DEi, nArgsi, ii, 0 >
+        {
+            typedef CheckDestArg< STi, SEi, DTi, DEi, nArgsi, ii, dVar > Result;
+        public:
+            typedef typename Result::ResultEnv ResultEnv;
+            enum { ret = Result::ret };
+        };
+
+        typedef CheckSrcVal< ST, SE, DT, DE, nArgs, i, TypeEqual< SrcVal, NullItem >::val > Result;
+    public:
+        typedef typename Result::ResultEnv ResultEnv;
+        enum { ret = Result::ret };
+    };
+
+    template< typename ST, typename SE, typename DT, typename DE, unsigned nArgs >
+    class UnifyR< ST, SE, DT, DE, nArgs, nArgs >
+    {
+    public:
+        typedef DE ResultEnv;
+        enum { ret = 1 };
+    };
+
+    template< typename ST, typename SE, typename DT, typename DE, unsigned nArgs, int eq >
+    class CmpPred
+    {
+        typedef UnifyR< ST, SE, DT, DE, nArgs, 0 > Result;
+    public:
+        typedef typename Result::ResultEnv ResultEnv;
+        enum { ret = Result::ret };
+    };
+
+    template< typename ST, typename SE, typename DT, typename DE, unsigned nArgs >
+    class CmpPred< ST, SE, DT, DE, nArgs, 0 >
+    {
+    public:
+        typedef DE ResultEnv;
+        enum { ret = 0 };
+    };
+
+    template< typename ST, typename SE, typename DT, typename DE, unsigned nSrcArgs, int eq >
+    class CmpArgs
+    {
+        typedef TypeEqual< typename ST::Pred, typename DT::Pred > ComparePredicates;
+        typedef CmpPred< ST, SE, DT, DE, nSrcArgs, ComparePredicates::val > Result;
+    public:
+        typedef typename Result::ResultEnv ResultEnv;
+        enum { ret = Result::ret };
+    };
+
+    template< typename ST, typename SE, typename DT, typename DE, unsigned nSrcArgs >
+    class CmpArgs< ST, SE, DT, DE, nSrcArgs, 0 >
+    {
+    public:
+        typedef DE ResultEnv;
+        enum { ret = 0 };
+    };
+
+    typedef typename SrcTerm::Args SrcArgs;
+    typedef typename DestTerm::Args DestArgs;
+    typedef CmpArgs< SrcTerm, SrcEnv, DestTerm, DestEnv, ListLength<SrcArgs>::val,
+                     ListLength<SrcArgs>::val == ListLength<DestArgs>::val > Result;
+public:
+    typedef typename Result::ResultEnv ResultEnv;
+    enum { ret = Result::ret };
 };
 
 } // namespace prolog
