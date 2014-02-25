@@ -12,12 +12,17 @@ struct Value
     typedef T value_type;
 };
 
-#define DECLARE_STR( s, postfix )  \
-    struct StringValue_##postfix { \
-        static const char *val;    \
-        typedef char *value_type;  \
-    };                             \
-    const char *StringValue_##postfix::val = s;
+
+#define DECLARE_NAME( s, isVar )          \
+    struct Value_##s {                    \
+        static const char *val;           \
+        typedef char *value_type;         \
+        static const bool var = isVar;    \
+    };                                    \
+    const char *Value_##s::val = #s;      \
+
+#define DECLARE_SYM( s ) DECLARE_NAME( s, false )
+#define DECLARE_VAR( s ) DECLARE_NAME( s, true )
 
 template< typename T1, typename T2>
 struct TypeEqual
@@ -195,13 +200,13 @@ template< class List > struct ListLength;
 template<>
 struct ListLength< NullItem >
 {
-    enum { val = 0 };
+    static const unsigned val = 0;
 };
 
 template< class V, class L >
 struct ListLength< List< V, L > >
 {
-    enum { val = 1 + ListLength<L>::val };
+    static const unsigned val = 1 + ListLength<L>::val;
 };
 
 template< class List > struct Next;
@@ -651,6 +656,18 @@ struct Pair
     typedef V Value;
 };
 
+template< typename Pair >
+struct GetPairValue
+{
+    typedef typename Pair::Value Value;
+};
+
+template<>
+struct GetPairValue< NullItem >
+{
+    typedef NullItem Value;
+};
+
 template< typename Key, typename Map >
 class FindKey
 {
@@ -757,6 +774,32 @@ public:
     typedef Map NextType;
 };
 
+template< typename Map >
+class PrintMap
+{
+    typedef typename Map::value_type PairType;
+    typedef typename PairType::Key K;
+    typedef typename PairType::Value V;
+
+    typedef typename Next< Map >::NextType Forward;
+public:
+    static void Print()
+    {
+        cout << "(" << K::val << ", " << V::val << "),";
+        PrintMap< Forward >::Print();
+    }
+};
+
+template<>
+class PrintMap< NullItem >
+{
+public:
+    static void Print()
+    {
+        cout << endl;
+    }
+};
+
 } // namespace map
 
 } // namespace container
@@ -788,16 +831,17 @@ class Unify
     {
         typedef typename Advance< typename ST::Args, i >::NextType STT;
         typedef typename STT::value_type SrcArg;
-        enum { sVar = ( SrcArg::val[0] >= 'A' ) || ( SrcArg::val[0] <= 'Z' ) };
+        enum { sVar = SrcArg::var };
 
         typedef typename Advance< typename DT::Args, i >::NextType DTT;
         typedef typename DTT::value_type DestArg;
-        enum { dVar = ( DestArg::val[0] >= 'A' ) || ( DestArg::val[0] <= 'Z' ) };
+        enum { dVar = DestArg::var };
 
         template< typename sArg, typename sEnv, int isVar >
         struct DefineSrcVal
         {
-            typedef typename FindKey< sArg, sEnv >::NextType Val;
+            typedef typename FindKey< sArg, sEnv >::NextType FoundPair;
+            typedef typename GetPairValue< FoundPair >::Value Val;
         };
 
         template< typename sArg, typename sEnv >
@@ -829,7 +873,8 @@ class Unify
         template< typename STi, typename SEi, typename DTi, typename DEi, unsigned nArgsi, int ii, typename DestVal, int eq >
         class CheckDestVal
         {
-            typedef CompareWithSrcVal< STi, SEi, DTi, DEi, nArgsi, ii, TypeEqual< DestVal, SrcVal >::val > Result;
+            typedef typename AddKey< Pair< DestArg, SrcVal >, DEi >::NextType Updated;
+            typedef UnifyR< STi, SEi, DTi, Updated, nArgsi, ii + 1 > Result; // next iteration
         public:
             typedef typename Result::ResultEnv ResultEnv;
             enum { ret = Result::ret };
@@ -838,8 +883,7 @@ class Unify
         template< typename STi, typename SEi, typename DTi, typename DEi, unsigned nArgsi, int ii, typename DestVal >
         class CheckDestVal< STi, SEi, DTi, DEi, nArgsi, ii, DestVal, 0 >
         {
-            typedef typename AddKey< Pair< DestArg, DestVal >, DEi >::NextType Updated;
-            typedef UnifyR< STi, SEi, DTi, Updated, nArgsi, ii + 1 > Result; // next iteration
+            typedef CompareWithSrcVal< STi, SEi, DTi, DEi, nArgsi, ii, TypeEqual< DestVal, SrcVal >::val > Result;
         public:
             typedef typename Result::ResultEnv ResultEnv;
             enum { ret = Result::ret };
@@ -947,12 +991,50 @@ public:
 // string type declaration
 namespace tcalc
 {
-    DECLARE_STR( "abc", 1 );
+    DECLARE_SYM( boy );
+    DECLARE_SYM( bill );
+    DECLARE_SYM( frank );
+    DECLARE_VAR( X );
+    DECLARE_VAR( G );
 }
 
 
 void TestProlog()
 {
+    using namespace tcalc;
+    using namespace tcalc::container::list;
+    using namespace tcalc::prolog;
+
+    // test unification
+    typedef Term< Value_boy, List< Value_bill, NullItem > > TermA;
+    typedef Term< Value_boy, List< Value_frank, NullItem > > TermB;
+    typedef Term< Value_boy, List< Value_X, NullItem > > TermX;
+    typedef Term< Value_boy, List< Value_G, NullItem > > TermG;
+
+    typedef Unify< TermA, NullItem, TermB, NullItem > Unified1;
+    cout << Unified1::ret << endl;
+    PrintMap< Unified1::ResultEnv >::Print();
+
+    typedef Unify< TermA, NullItem, TermA, NullItem > Unified2;
+    cout << Unified2::ret << endl;
+    PrintMap< Unified2::ResultEnv >::Print();
+
+    typedef Unify< TermA, NullItem, TermX, NullItem > Unified3;
+    cout << Unified3::ret << endl;
+    PrintMap< Unified3::ResultEnv >::Print();
+
+    typedef Unify< TermB, NullItem, TermX, Unified3::ResultEnv > Unified4;
+    cout << Unified4::ret << endl;
+    PrintMap< Unified4::ResultEnv >::Print();
+
+    typedef Unify< TermG, NullItem, TermX, NullItem > Unified5;
+    cout << Unified5::ret << endl;
+    PrintMap< Unified5::ResultEnv >::Print();
+
+    typedef List< Pair< Value_G, Value_frank >, NullItem > Env;
+    typedef Unify< TermG, Env, TermX, NullItem > Unified6;
+    cout << Unified6::ret << endl;
+    PrintMap< Unified6::ResultEnv >::Print();
 }
 
 void TestList()
@@ -1030,7 +1112,7 @@ void TestList()
 
     ////////
 
-    typedef List< Value< int, 1 >, List< StringValue_1, NullItem > > ValueList;
+    //typedef List< Value< int, 1 >, List< StringValue_1, NullItem > > ValueList;
     //ValueList::Print();
 }
 
