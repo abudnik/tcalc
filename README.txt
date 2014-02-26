@@ -8,5 +8,5 @@ prolog.cpp - Prolog-like program examples
 tcalc.h    - Prolog interpreter source
 test.cpp   - various tests
 
-P.S. Every good programmer should write at least one weird program, like chess game
-written in 'sed' utility, artificial neural network in Brainfuck, etc.
+P.S. Every good programmer should write at least one weird program, like chess
+game written in 'sed' utility, artificial neural network in Brainfuck, etc.
