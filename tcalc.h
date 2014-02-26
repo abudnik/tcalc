@@ -1,3 +1,9 @@
+/*
+  C++ compile-time Prolog interpreter
+  By Andrey Budnik, Belarus
+  Public Domain
+*/
+
 #ifndef __TCALK_H
 #define __TCALK_H
 
