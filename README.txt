@@ -1,8 +1,8 @@
 C++ COMPILE-TIME PROLOG INTERPRETER
 -----------------------------------
 
-C++ Templates are Turing Complete. It means that any computation expressible by a
-computer program can be computed, in some form, by a template metaprogram.
+C++ Templates are Turing Complete. It means that any computation expressible by
+a computer program can be computed, in some form, by a template metaprogram.
 
 prolog.cpp - Prolog-like program examples
 tcalc.h    - Prolog interpreter source
