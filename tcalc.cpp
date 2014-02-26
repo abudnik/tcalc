@@ -999,7 +999,7 @@ DECLARE_SYM( got_ );
 DECLARE_SYM( goal_ );
 
 template< typename SearchTerm, typename GlobalRules >
-class Search
+class SearchGoal
 {
     typedef Term< Value_got_, List< Value_goal_, NullItem > > GoalTerm;
     typedef Rule< GoalTerm, List< SearchTerm, NullItem > > MainRule;
@@ -1008,7 +1008,7 @@ class Search
     template< typename GoalStack, typename Rules >
     class SearchR
     {
-        template< typename GS, typename R, typename G, int eq >
+        template< typename GS, typename G, int eq >
         class CheckOriginalGoal
         {
         public:
@@ -1016,8 +1016,8 @@ class Search
             enum { ret = 1 };
         };
 
-        template< typename GS, typename R, typename G >
-        class CheckOriginalGoal< GS, R, G, 0 >
+        template< typename GS, typename G >
+        class CheckOriginalGoal< GS, G, 0 >
         {
             typedef typename G::P P;
             typedef typename G::R Rule;
@@ -1039,83 +1039,80 @@ class Search
             enum { ret = Result::ret };
         };
 
-        template< typename GS, typename R, bool ge >
+        template< typename GS, bool ge >
         class CheckGoalIndex
         {
             typedef typename GS::value_type G;
-            typedef typename G::Parent P;
+            typedef typename G::P P;
             typedef typename Next< GS >::NextType PopG;
 
-            typedef CheckOriginalGoal< PopG, R, G, TypeEqual< P, NullItem >::val > Result;
+            typedef CheckOriginalGoal< PopG, G, TypeEqual< P, NullItem >::val > Result;
         public:
             typedef typename Result::ResultEnv ResultEnv;
             enum { ret = Result::ret };
         };
 
-        template< typename G, typename GS, typename R, typename T, typename CurrentR = R >
+        template< typename G, typename GS, typename T, typename CurrentR >
         class IterateRules
         {
-            template< typename GSi, typename Ri, typename Ti, typename CurrentRi, typename Child, int eq >
+            template< typename GSi, typename Child, int eq >
             class CheckAnswer
             {
                 typedef List< Child, GSi > PushChild;
-                typedef IterateRules< G, PushChild, Ri, Ti, CurrentRi > Result;
+                typedef IterateRules< G, PushChild, T, typename Next<CurrentR>::NextType > Result;
             public:
                 typedef typename Result::ResultEnv ResultEnv;
                 enum { ret = Result::ret };
             };
 
-            template< typename GSi, typename Ri, typename Ti, typename CurrentRi, typename Child >
-            class CheckAnswer< GSi, Ri, Ti, CurrentRi, Child, 0 >
+            template< typename GSi, typename Child >
+            class CheckAnswer< GSi, Child, 0 >
             {
-                typedef IterateRules< G, GSi, Ri, Ti, CurrentRi > Result;
+                typedef IterateRules< G, GSi, T, typename Next<CurrentR>::NextType > Result;
             public:
                 typedef typename Result::ResultEnv ResultEnv;
                 enum { ret = Result::ret };
             };
 
-            template< typename GSi, typename Ri, typename Ti, typename CurrentRi, int eq >
+            template< typename GSi, int eq >
             class CheckArgs
             {
-                typedef typename CurrentRi::value_type CurrentRule;
+                typedef typename CurrentR::value_type CurrentRule;
 
-                typedef Goal< CurrentRule, G > Child;
+                typedef Unify< T, typename G::E, typename CurrentRule::Head, NullItem > Unified;
+                typedef Goal< CurrentRule, G, typename Unified::ResultEnv > Child;
 
-                typedef Unify< Ti, typename G::E, typename CurrentRule::Head, typename Child::E > Unified;
-                typedef Goal< typename Child::R, typename Child::P, typename Unified::ResultEnv, Child::index > NewChild;
-
-                typedef CheckAnswer< GSi, Ri, Ti, CurrentRi, NewChild, Unified::ret  > Result;
+                typedef CheckAnswer< GSi, Child, Unified::ret > Result;
             public:
                 typedef typename Result::ResultEnv ResultEnv;
                 enum { ret = Result::ret };
             };
 
-            template< typename GSi, typename Ri, typename Ti, typename CurrentRi >
-            class CheckArgs< GSi, Ri, Ti, CurrentRi, 0 >
+            template< typename GSi >
+            class CheckArgs< GSi, 0 >
             {
-                typedef IterateRules< G, GSi, Ri, Ti, CurrentRi > Result;
+                typedef IterateRules< G, GSi, T, typename Next<CurrentR>::NextType > Result;
             public:
                 typedef typename Result::ResultEnv ResultEnv;
                 enum { ret = Result::ret };
             };
 
-            template< typename GSi, typename Ri, typename Ti, typename CurrentRi, int eq >
+            template< typename GSi, int eq >
             class CheckPredicates
             {
-                typedef typename CurrentRi::value_type CurrentRule;
+                typedef typename CurrentR::value_type CurrentRule;
                 typedef typename CurrentRule::Head CurrentRuleHead;
 
-                typedef CheckArgs< GSi, Ri, Ti, CurrentRi,
-                                   ListLength< typename Ti::Args >::val == ListLength< typename CurrentRuleHead::Args >::val > Result;
+                typedef CheckArgs< GSi, ListLength< typename T::Args >::val == ListLength< typename CurrentRuleHead::Args >::val > Result;
             public:
                 typedef typename Result::ResultEnv ResultEnv;
                 enum { ret = Result::ret };
             };
 
-            template< typename GSi, typename Ri, typename Ti, typename CurrentRi >
-            class CheckPredicates< GSi, Ri, Ti, CurrentRi, 0 >
+            template< typename GSi >
+            class CheckPredicates< GSi, 0 >
             {
-                typedef IterateRules< GSi, Ri, Ti, CurrentRi > Result;
+                typedef IterateRules< G, GSi, T, typename Next<CurrentR>::NextType > Result;
             public:
                 typedef typename Result::ResultEnv ResultEnv;
                 enum { ret = Result::ret };
@@ -1124,23 +1121,23 @@ class Search
             typedef typename CurrentR::value_type CurrentRule;
             typedef typename CurrentRule::Head CurrentRuleHead;
 
-            typedef CheckPredicates< GS, R, T, CurrentR, TypeEqual< typename CurrentRuleHead::Pred, typename T::Pred >::val > Result;
+            typedef CheckPredicates< GS, TypeEqual< typename CurrentRuleHead::Pred, typename T::Pred >::val > Result;
         public:
             typedef typename Result::ResultEnv ResultEnv;
             enum { ret = Result::ret };
         };
 
-        template< typename G, typename GS, typename R, typename T >
-        class IterateRules< G, GS, R, T, NullItem >
+        template< typename G, typename GS, typename T >
+        class IterateRules< G, GS, T, NullItem >
         {
-            typedef SearchR< GS, R > Result;
+            typedef SearchR< GS, Rules > Result;
         public:
             typedef typename Result::ResultEnv ResultEnv;
             enum { ret = Result::ret };
         };
 
-        template< typename GS, typename R >
-        class CheckGoalIndex< GS, R, false >
+        template< typename GS >
+        class CheckGoalIndex< GS, false >
         {
             typedef typename GS::value_type G;
             typedef typename Next< GS >::NextType PopG;
@@ -1148,19 +1145,19 @@ class Search
             typedef typename G::R Rule;
             typedef typename Rule::Goals RGoals;
             typedef typename Advance< RGoals, G::index >::NextType RGoalsOffset;
-            typedef typename RGoalsOffset::value_type RGoal;
+            typedef typename RGoalsOffset::value_type T;
 
-            typedef IterateRules< G, PopG, R, RGoal > Result;
+            typedef IterateRules< G, PopG, T, Rules > Result;
         public:
             typedef typename Result::ResultEnv ResultEnv;
             enum { ret = Result::ret };
         };
 
         typedef typename GoalStack::value_type G;
-        typedef typename G::Rule R;
+        typedef typename G::R R;
         typedef typename R::Goals SubGoals;
 
-        typedef CheckGoalIndex< GoalStack, Rules, ( G::index >= ListLength<SubGoals>::val ) > Result;
+        typedef CheckGoalIndex< GoalStack, ( G::index >= ListLength<SubGoals>::val ) > Result;
     public:
         typedef typename Result::ResultEnv ResultEnv;
         enum { ret = Result::ret };
@@ -1188,9 +1185,13 @@ public:
 // symbolic & variable type declaration
 namespace tcalc
 {
+    DECLARE_SYM( child );
     DECLARE_SYM( boy );
+    DECLARE_SYM( girl );
     DECLARE_SYM( bill );
     DECLARE_SYM( frank );
+    DECLARE_SYM( alice );
+    DECLARE_SYM( alex );
     DECLARE_VAR( X );
     DECLARE_VAR( G );
 }
@@ -1232,7 +1233,28 @@ void TestProlog()
     cout << Unified6::ret << endl;
     PrintMap< Unified6::ResultEnv >::Print();
 
+    cout << "--------" << endl;
+
     // test search
+    typedef Term< Value_child, List< Value_X, NullItem > > TermChildX;       // child(X)
+    typedef Term< Value_boy, List< Value_X, NullItem > > TermBoyX;           // boy(X)
+    typedef Term< Value_girl, List< Value_X, NullItem > > TermGirlX;         // girl(X)
+    typedef Term< Value_boy, List< Value_alex, NullItem > > TermBoyAlex;     // boy(alex)
+    typedef Term< Value_girl, List< Value_alice, NullItem > > TermGirlAlice; // girl(alice)
+    typedef Term< Value_child, List< Value_G, NullItem > > TermChildG;       // child(G)
+
+    typedef Rule< TermBoyAlex, NullItem > RuleBoyAlex;                       // boy(alex) :- True
+    typedef Rule< TermGirlAlice, NullItem > RuleGirlAlice;                   // girl(alice) :- True
+    typedef Rule< TermChildX, List< TermBoyX, NullItem > > RuleChildBoy;     // child(X) :- boy(x)
+    typedef Rule< TermChildX, List< TermGirlX, NullItem > > RuleChildGirl;   // child(X) :- girl(x)
+
+    typedef List< RuleChildBoy, List< RuleChildGirl,
+                                      List< RuleBoyAlex, List< RuleGirlAlice, NullItem > > > > AllRules;
+
+    typedef SearchGoal< TermChildG, AllRules > Result;
+    //typedef SearchGoal< TermBoyX, AllRules > Result;
+    cout << Result::ret << endl;
+    PrintMap< Result::ResultEnv >::Print();
 }
 
 void TestList()
