@@ -774,6 +774,38 @@ public:
     typedef Map NextType;
 };
 
+template< typename Map1, typename Map2 >
+class MergeMap
+{
+    typedef typename Map2::value_type Pair2;
+    typedef typename Next<Map2>::NextType Forward;
+
+    typedef typename AddKey< Pair2, Map1 >::NextType MergedWithFirst;
+public:
+    typedef typename MergeMap< MergedWithFirst, Forward >::NextType NextType;
+};
+
+template< typename Map1 >
+class MergeMap< Map1, NullItem >
+{
+public:
+    typedef Map1 NextType;
+};
+
+template< typename Map2 >
+class MergeMap< NullItem, Map2 >
+{
+public:
+    typedef Map2 NextType;
+};
+
+template<>
+class MergeMap< NullItem, NullItem >
+{
+public:
+    typedef NullItem NextType;
+};
+
 template< typename Map >
 class PrintMap
 {
@@ -1011,8 +1043,9 @@ class SearchGoal
         template< typename GS, typename G, int eq >
         class CheckOriginalGoal
         {
+            typedef SearchR< GS, Rules > Result;
         public:
-            typedef typename G::E ResultEnv;
+            typedef typename Merge< typename G::E, typename Result::ResultEnv >::NextType ResultEnv;
             enum { ret = 1 };
         };
 
@@ -1029,7 +1062,7 @@ class SearchGoal
 
             typedef Unify< typename Rule::Head, typename G::E, PGoal, typename P::E > Unified;
 
-            typedef Goal< typename P::R, typename P::P, typename Unified::ResultEnv, P::index + 1 > NewParent;
+            typedef Goal< PRule, typename P::P, typename Unified::ResultEnv, P::index + 1 > NewParent;
 
             typedef List< NewParent, GS > PushNewParent;
 
